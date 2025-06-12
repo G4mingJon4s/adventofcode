@@ -42,97 +42,87 @@ void freeLinked(Linked* l) {
     }
 }
 
-typedef Linked* (*OpCodeFunc)(Linked** input, int* params, int* mem, int mode, int* ptr);
+typedef int (*OpCodeFunc)(Linked** input, int* params, int* mem, int mode, int* ptr);
 
-Linked* _opAdd(Linked** __input, int* params, int* mem, int mode, int* ptr) {
+int _opAdd(Linked** __input, int* params, int* mem, int mode, int* ptr) {
     (void) __input;
 
-    printf("Add %d %d %d\n", params[0], params[1], params[2]);
     mem[params[2]] = ((mode % 10) == 1 ? params[0] : mem[params[0]]) + (((mode / 10) % 10) == 1 ? params[1] : mem[params[1]]);
     *ptr += 4;
 
-    return NULL;
+    return INT_MIN;
 }
 
-Linked* _opMult(Linked** __input, int* params, int* mem, int mode, int* ptr) {
+int _opMult(Linked** __input, int* params, int* mem, int mode, int* ptr) {
     (void) __input;
 
-    printf("Mult %d %d %d\n", params[0], params[1], params[2]);
     mem[params[2]] = ((mode % 10) == 1 ? params[0] : mem[params[0]]) * (((mode / 10) % 10) == 1 ? params[1] : mem[params[1]]);
     *ptr += 4;
 
-    return NULL;
+    return INT_MIN;
 }
 
-Linked* _opInput(Linked** input, int* params, int* mem, int __mode, int* ptr) {
+int _opInput(Linked** input, int* params, int* mem, int __mode, int* ptr) {
     (void) __mode;
 
-    printf("Input %d (%d)\n", params[0], (*input)->value);
     mem[params[0]] = (*input)->value;
     *input = (*input)->prev;
     *ptr += 2;
 
-    return NULL;
+    return INT_MIN;
 }
 
-Linked* _opOutput(Linked** __input, int* params, int* mem, int mode, int* ptr) {
+int _opOutput(Linked** __input, int* params, int* mem, int mode, int* ptr) {
     (void) __input;
 
-    printf("Output %d (%d)\n", params[0], mode == 1 ? params[0]: mem[params[0]]);
-    Linked* out = malloc(sizeof(Linked));
-    out->prev = NULL;
-    out->value = mode == 1 ? params[0] : mem[params[0]];
+    int out = (mode == 1) ? params[0] : mem[params[0]];
     *ptr += 2;
 
     return out;
 }
 
-Linked* _opJmpT(Linked** __input, int* params, int* mem, int mode, int* ptr) {
+int _opJmpT(Linked** __input, int* params, int* mem, int mode, int* ptr) {
     (void) __input;
 
-    printf("JmpT %d %d\n", params[0], params[1]);
     if (((mode % 10) == 1 ? params[0] : mem[params[0]]) != 0) {
         *ptr = ((mode / 10) % 10) == 1 ? params[1] : mem[params[1]];
     } else *ptr += 3;
 
-    return NULL;
+    return INT_MIN;
 }
 
-Linked* _opJmpF(Linked** __input, int* params, int* mem, int mode, int* ptr) {
+int _opJmpF(Linked** __input, int* params, int* mem, int mode, int* ptr) {
     (void) __input;
 
-    printf("JmpF %d %d\n", params[0], params[1]);
     if (((mode % 10) == 1 ? params[0] : mem[params[0]]) == 0) {
         *ptr = ((mode / 10) % 10) == 1 ? params[1] : mem[params[1]];
     } else *ptr += 3;
 
-    return NULL;
+    return INT_MIN;
 }
 
-Linked* _opLT(Linked** __input, int* params, int* mem, int mode, int* ptr) {
+int _opLT(Linked** __input, int* params, int* mem, int mode, int* ptr) {
     (void) __input;
 
-    printf("LT %d %d %d\n", params[0], params[1], params[2]);
     if (((mode % 10) == 1 ? params[0] : mem[params[0]]) < (((mode / 10) % 10) == 1 ? params[1] : mem[params[1]])) {
         mem[params[2]] = 1;
     } else mem[params[2]] = 0;
 
     *ptr += 4;
 
-    return NULL;
+    return INT_MIN;
 }
 
-Linked* _opEQ(Linked** __input, int* params, int* mem, int mode, int* ptr) {
+int _opEQ(Linked** __input, int* params, int* mem, int mode, int* ptr) {
     (void) __input;
 
-    printf("EQ %d %d %d\n", params[0], params[1], params[2]);
     if (((mode % 10) == 1 ? params[0] : mem[params[0]]) == (((mode / 10) % 10) == 1 ? params[1] : mem[params[1]])) {
         mem[params[2]] = 1;
     } else mem[params[2]] = 0;
 
     *ptr += 4;
 
-    return NULL;
+    return INT_MIN;
 }
 
 OpCodeFunc opCodeFuncs[] = {
@@ -147,19 +137,16 @@ OpCodeFunc opCodeFuncs[] = {
     _opEQ,
 };
 
-Linked* runAmplifier(int* ram, int* ptr, int len, Linked* inputs, Linked** pass) {
-    Linked* out = NULL;
-
-    int i = 0;
+int runAmplifier(int* ram, int* ptr, int len, Linked* inputs, int* finished) {
     while (*ptr < len && ram[*ptr] != 99) {
-        printf("Ex #%d (%d).\n", ++i, *ptr);
         int rawCode = ram[*ptr];
         int opCode = rawCode % 100;
 
         int paramCount = numParams(opCode);
         if (paramCount == -1) {
             printf("Invalid OpCode %d (%d).\n", opCode, rawCode);
-            return NULL;
+            *finished = 1;
+            return INT_MIN;
         }
         rawCode /= 100;
 
@@ -168,69 +155,52 @@ Linked* runAmplifier(int* ram, int* ptr, int len, Linked* inputs, Linked** pass)
             values[i] = ram[*ptr + i + 1];
         }
 
-        Linked* ret = opCodeFuncs[opCode](&inputs, values, ram, rawCode, ptr);
-        if (ret != NULL) {
-            ret->prev = out;
-            out = ret;
-            *pass = out;
-            return NULL;
+        int ret = opCodeFuncs[opCode](&inputs, values, ram, rawCode, ptr);
+        if (ret != INT_MIN) {
+            *finished = 0;
+            return ret;
         }
     }
 
-    return out;
+    *finished = 1;
+    return INT_MIN;
 }
 
-int testSeq(const int* mem, int len, int* seq) {
-    printf("Seq with len %d\n", len);
-    int* rams = malloc(5 * len);
-    for (int i = 0; i < 5; i++) memcpy(&rams[i * len], mem, len);
+int testSeq(const int* mem, int len, const int* seq) {
+    int* rams = malloc(5 * len * sizeof(int));
+    for (int i = 0; i < 5; i++) memcpy(&rams[i * len], mem, len * sizeof(int));
     int ptrs[] = { 0, 0, 0, 0, 0 };
 
     Linked inputs = { 0 };
     inputs.prev = NULL;
 
-    Linked* out = NULL;
-    int i = 0;
-    int repeat = 1;
-    while (out == NULL || i != 4) {
-        printf("Running: %d.\n", i);
-
-        Linked spass = { 0 };
-        spass.value = INT_MIN;
-        spass.prev = NULL;
-        Linked* pass = &spass;
-
+    for (int i = 0; i < 5; i++) {
         Linked seqinp = { 0 };
         seqinp.value = seq[i];
         seqinp.prev = &inputs;
 
-        out = runAmplifier(&rams[i * len], &ptrs[i], len, &seqinp, &pass);
-
-        if (out == NULL) {
-            if (pass->value == INT_MIN) printf("No passthrough in loop.\n");
-            inputs.value = pass->value;
-        } else {
-            inputs.value = out->value;
-            repeat = 0;
-        }
-
-        i++;
-        if (i >= 5) {
-            i = 0;
-            if (repeat == 0) break;
-        }
+        int f;
+        int o = runAmplifier(&rams[i * len], &ptrs[i], len, &seqinp, &f);
+        inputs.value = o;
     }
 
+    int out = inputs.value;
+    int i = 0;
+    while (i != 5) {
+
+        int finished = 0;
+        int o = runAmplifier(&rams[i * len], &ptrs[i], len, &inputs, &finished);
+        if (finished) break;
+
+        inputs.value = o;
+        if (i == 4) out = o;
+
+        i = (i + 1) % 5;
+    }
+
+    printf("Ret: %d.\n", out);
     free(rams);
-    if (out == NULL) {
-        printf("Ret: No return.\n");
-        return INT_MIN;
-    }
-
-    int ret = out->value;
-    printf("Ret: %d.\n", ret);
-    freeLinked(out);
-    return ret;
+    return out;
 }
 
 void swap(int* a, int* b) {
@@ -241,7 +211,7 @@ void swap(int* a, int* b) {
 
 void permutate(const int* mem, int len, int* out, int* arr, int start, int end) {
     if (start == end) {
-        printf("Testing permutation...\n");
+        printf("Testing permutation [%d %d %d %d %d]\n", arr[0], arr[1], arr[2], arr[3], arr[4]);
         int ret = testSeq(mem, len, arr);
         if (*out < ret) *out = ret;
         return;
