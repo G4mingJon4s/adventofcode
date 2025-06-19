@@ -17,3 +17,4 @@ String* __openDataFile(const char* filename);
 #define openDataFile() __openDataFile(__FILE__)
 
 Lines* splitLines(const String* contents, char del);
+void freeLines(Lines* l);

@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -std=c17 -Wall -Wextra -O2 -g
+CFLAGS = -std=c17 -Wall -Wextra -O0 -g
 
 SRC_DIR = days
 LIB_DIR = lib
@@ -22,10 +22,10 @@ $(shell mkdir -p $(BUILD_DIR))
 all: FORCE $(BINARIES)
 
 $(BUILD_DIR)/day%_part1: $(SRC_DIR)/day%/part1.c FORCE
-	$(CC) $(CFLAGS) -o $@ $< $(LIBS)
+	$(CC) $(CFLAGS) -o $@ $< $(LIBS) -lm
 
 $(BUILD_DIR)/day%_part2: $(SRC_DIR)/day%/part2.c FORCE
-	$(CC) $(CFLAGS) -o $@ $< $(LIBS)
+	$(CC) $(CFLAGS) -o $@ $< $(LIBS) -lm
 
 .PHONY: clean
 clean:

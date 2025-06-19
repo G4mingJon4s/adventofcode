@@ -68,3 +68,11 @@ Lines* splitLines(const String* contents, char del) {
 
     return out;
 }
+
+void freeLines(Lines* l) {
+    if (l == NULL) return;
+
+    for (int i = 0; i < l->len; i++) free(l->arr[i].chars);
+    free(l->arr);
+    free(l);
+}
