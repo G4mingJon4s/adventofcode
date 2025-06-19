@@ -30,6 +30,36 @@ int numParams(enum OpCode code) {
     return -1;
 }
 
+struct Point {
+    long long x;
+    long long y;
+};
+typedef struct Point Point;
+
+struct Paint {
+    Point point;
+    long long value;
+    struct Paint* next;
+};
+typedef struct Paint Paint;
+
+Paint* findPainted(Paint* painted, Point* p) {
+    while (painted != NULL) {
+        if (painted->point.x == p->x && painted->point.y == p->y) return painted;
+        painted = painted->next;
+    }
+
+    return NULL;
+}
+
+void freePainted(Paint* c) {
+    while (c != NULL) {
+        Paint* n = c->next;
+        free(c);
+        c = n;
+    }
+}
+
 struct Linked {
     long long value;
     struct Linked* prev;
@@ -322,20 +352,52 @@ int main() {
     mem.ptr = 0;
     mem.base = 0;
 
-    Linked inputs;
-    inputs.value = 2;
-    inputs.prev = NULL;
+    Paint* painted = NULL;
+    Point robot = { 0, 0 };
+    int facing = 0;
 
-    printf("Setup complete.\n");
+    while(1) {
+        int finished = 0;
+        Paint* cur = findPainted(painted, &robot);
+        Linked input = { cur == NULL ? 0 : cur->value, NULL };
+        Linked* inputs = &input;
 
-    Linked* outputs = runUntilFinished(&mem, &inputs);
-    if (outputs == NULL) printf("No outputs.\n");
-    else {
-        printf("Output: ");
-        printLinked(outputs);
-        printf("\n");
+        long long newPaint = runIntcode(&mem, &inputs, &finished);
+        long long rotate = runIntcode(&mem, &inputs, &finished);
+
+        if (cur != NULL) cur->value = newPaint;
+        else {
+            Paint* new = malloc(sizeof(Paint));
+            new->value = newPaint;
+            new->point.x = robot.x;
+            new->point.y = robot.y;
+            new->next = painted;
+            painted = new;
+        }
+
+        facing += 2 * rotate - 1;
+        if (facing < 0) facing = 3;
+        if (facing > 3) facing = 0;
+
+        switch (facing) {
+            case 0: { robot.y++; break; }
+            case 1: { robot.x++; break; }
+            case 2: { robot.y--; break; }
+            case 3: { robot.x--; break; }
+        }
+
+        if (finished) break;
     }
 
-    freeLinked(outputs);
+    int numPainted = 0;
+    Paint* cur = painted;
+    while (cur != NULL) {
+        numPainted++;
+        cur = cur->next;
+    }
+
+    printf("Spots painted: %d\n", numPainted);
+
+    freePainted(painted);
     free(mem.values);
 }

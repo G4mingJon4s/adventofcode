@@ -30,6 +30,36 @@ int numParams(enum OpCode code) {
     return -1;
 }
 
+struct Point {
+    long long x;
+    long long y;
+};
+typedef struct Point Point;
+
+struct Paint {
+    Point point;
+    long long value;
+    struct Paint* next;
+};
+typedef struct Paint Paint;
+
+Paint* findPainted(Paint* painted, Point* p) {
+    while (painted != NULL) {
+        if (painted->point.x == p->x && painted->point.y == p->y) return painted;
+        painted = painted->next;
+    }
+
+    return NULL;
+}
+
+void freePainted(Paint* c) {
+    while (c != NULL) {
+        Paint* n = c->next;
+        free(c);
+        c = n;
+    }
+}
+
 struct Linked {
     long long value;
     struct Linked* prev;
@@ -322,20 +352,91 @@ int main() {
     mem.ptr = 0;
     mem.base = 0;
 
-    Linked inputs;
-    inputs.value = 2;
-    inputs.prev = NULL;
+    Paint* painted = malloc(sizeof(Paint));
+    painted->point.x = 0;
+    painted->point.y = 0;
+    painted->value = 1;
+    painted->next = NULL;
 
-    printf("Setup complete.\n");
+    Point robot = { 0, 0 };
+    int facing = 0;
 
-    Linked* outputs = runUntilFinished(&mem, &inputs);
-    if (outputs == NULL) printf("No outputs.\n");
-    else {
-        printf("Output: ");
-        printLinked(outputs);
-        printf("\n");
+    while(1) {
+        int finished = 0;
+        Paint* cur = findPainted(painted, &robot);
+        Linked input = { cur == NULL ? 0 : cur->value, NULL };
+        Linked* inputs = &input;
+
+        long long newPaint = runIntcode(&mem, &inputs, &finished);
+        long long rotate = runIntcode(&mem, &inputs, &finished);
+
+        if (cur != NULL) cur->value = newPaint;
+        else {
+            Paint* new = malloc(sizeof(Paint));
+            new->value = newPaint;
+            new->point.x = robot.x;
+            new->point.y = robot.y;
+            new->next = painted;
+            painted = new;
+        }
+
+        facing += 2 * rotate - 1;
+        if (facing < 0) facing = 3;
+        if (facing > 3) facing = 0;
+
+        switch (facing) {
+            case 0: { robot.y--; break; }
+            case 1: { robot.x++; break; }
+            case 2: { robot.y++; break; }
+            case 3: { robot.x--; break; }
+        }
+
+        if (finished) break;
     }
 
-    freeLinked(outputs);
+    Point min = { LLONG_MAX, LLONG_MAX };
+    Point max = { LLONG_MIN, LLONG_MIN };
+    Paint* cur = painted;
+
+    while (cur != NULL) {
+        long long x = cur->point.x;
+        long long y = cur->point.y;
+
+        if (min.x > x) min.x = x;
+        if (min.y > y) min.y = y;
+        if (max.x < x) max.x = x;
+        if (max.y < y) max.y = y;
+
+        cur = cur->next;
+    }
+
+    printf("Min: %lld %lld, Max: %lld %lld\n", min.x, min.y, max.x, max.y);
+    long long W = max.x - min.x + 1;
+    long long H = max.y - min.y + 1;
+
+    char** grid = malloc(H * sizeof(char*));
+    for (long long i = 0; i < H; i++) {
+        grid[i] = calloc(W + 1, sizeof(char));
+        for (long long j = 0; j < W; j++) grid[i][j] = ' ';
+    }
+
+    cur = painted;
+    while (cur != NULL) {
+        long long x = cur->point.x - min.x;
+        long long y = cur->point.y - min.y;
+
+        if (cur->value == 1) grid[y][x] = 'W';
+        else grid[y][x] = ' ';
+
+        cur = cur->next;
+    }
+
+    for (long long i = 0; i < H; i++) {
+        printf("%s\n", grid[i]);
+        free(grid[i]);
+    }
+    free(grid);
+
+    freePainted(painted);
     free(mem.values);
 }
